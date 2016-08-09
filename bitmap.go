@@ -66,8 +66,7 @@ func (bitmap *bitmap) Bit(index int) int {
 	return int((uint(bitmap.data[div]) & (1 << uint(7-mod))) >> uint(7-mod))
 }
 
-// set sets the bit at index `index`.
-// If bit is true, set 1, otherwise set 0.
+// set sets the bit at index `index`. If bit is true, set 1, otherwise set 0.
 func (bitmap *bitmap) set(index int, bit int) {
 	if index >= bitmap.Size {
 		panic("index out of range")

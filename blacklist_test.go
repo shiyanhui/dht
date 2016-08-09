@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-var blacklist = newBlackList()
+var blacklist = newBlackList(256)
 
 func TestGenKey(t *testing.T) {
 	cases := []struct {

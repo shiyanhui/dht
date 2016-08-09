@@ -351,8 +351,6 @@ type routingTable struct {
 	cachedNodes    *syncedMap
 	cachedKBuckets *keyedDeque
 	dht            *DHT
-	// for crawl mode
-	needToRemove []*node
 }
 
 // newRoutingTable returns a new routingTable pointer.
@@ -366,7 +364,6 @@ func newRoutingTable(k int, dht *DHT) *routingTable {
 		cachedNodes:    newSyncedMap(),
 		cachedKBuckets: newKeyedDeque(),
 		dht:            dht,
-		needToRemove:   make([]*node, 0, dht.MaxNodes),
 	}
 
 	rt.cachedKBuckets.Push(root.kbucket.prefix.String(), root.kbucket)
@@ -540,6 +537,14 @@ func (rt *routingTable) Fresh() {
 	if rt.dht.IsCrawlMode() {
 		rt.Clear()
 	}
+}
+
+// Len returns the number of nodes in table.
+func (rt *routingTable) Len() int {
+	rt.RLock()
+	defer rt.RUnlock()
+
+	return rt.cachedNodes.Len()
 }
 
 // Implemention of heap with heap.Interface.

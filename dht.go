@@ -22,7 +22,7 @@ const (
 	CrawlMode
 )
 
-// DHTConfig represents the configure of dht.
+// Config represents the configure of dht.
 type Config struct {
 	K                    int
 	KBucketSize          int
@@ -42,7 +42,7 @@ type Config struct {
 	Try                  int
 }
 
-// newStandardConfig returns a Config pointer with default values.
+// NewStandardConfig returns a Config pointer with default values.
 func NewStandardConfig() *Config {
 	return &Config{
 		K:           8,
@@ -58,7 +58,7 @@ func NewStandardConfig() *Config {
 		KBucketExpiredAfter:  time.Duration(time.Minute * 15),
 		CheckKBucketPeriod:   time.Duration(time.Second * 30),
 		TokenExpiredAfter:    time.Duration(time.Minute * 10),
-		MaxTransactionCursor: 4294967296, // 2 ^ 32
+		MaxTransactionCursor: 4294967295, // 2 ^ 32 - 1
 		MaxNodes:             5000,
 		BlockedIPs:           make([]string, 0),
 		Try:                  2,
@@ -66,12 +66,13 @@ func NewStandardConfig() *Config {
 	}
 }
 
+// NewCrawlConfig returns a config in crawling mode.
 func NewCrawlConfig() *Config {
 	config := NewStandardConfig()
 	config.NodeExpriedAfter = 0
 	config.KBucketExpiredAfter = 0
 	config.CheckKBucketPeriod = time.Second * 5
-	config.KBucketSize = 4294967296
+	config.KBucketSize = 2147483647 // 2 ^ 31 - 1
 	config.Mode = CrawlMode
 
 	return config
@@ -90,8 +91,8 @@ type DHT struct {
 	Ready              bool
 }
 
-// NewDHT returns a DHT pointer.
-// If config is nil, then config will be set to the default config.
+// New returns a DHT pointer. If config is nil, then config will be set to
+// the default config.
 func New(config *Config) *DHT {
 	if config == nil {
 		config = NewStandardConfig()
@@ -105,7 +106,7 @@ func New(config *Config) *DHT {
 	d := &DHT{
 		Config:    config,
 		node:      node,
-		blackList: newBlackList(),
+		blackList: newBlackList(524288),
 	}
 
 	for _, ip := range config.BlockedIPs {
@@ -154,7 +155,7 @@ func (dht *DHT) init() {
 	go dht.blackList.clear()
 }
 
-// join make current node join the dht network.
+// join makes current node join the dht network.
 func (dht *DHT) join() {
 	for _, addr := range dht.PrimeNodes {
 		raddr, err := net.ResolveUDPAddr(dht.Network, addr)
@@ -257,7 +258,7 @@ func (dht *DHT) Run() {
 		case pkt = <-packetChan:
 			go handle(dht, pkt)
 		case <-tick:
-			if dht.routingTable.cachedNodes.Len() == 0 {
+			if dht.routingTable.Len() == 0 {
 				go dht.join()
 			} else if dht.transactionManager.len() == 0 {
 				go dht.routingTable.Fresh()

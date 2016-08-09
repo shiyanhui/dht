@@ -19,7 +19,7 @@ const (
 )
 
 const (
-	BLOCK             = 16384
+	BLOCK             = 16384 // 2 ^ 14
 	MAX_METADATA_SIZE = BLOCK * 1000
 	EXTENDED          = 20
 	HANDSHAKE         = 0
@@ -30,6 +30,7 @@ var handshakePrefix = []byte{
 	111, 116, 111, 99, 111, 108, 0, 0, 0, 0, 0, 16, 0, 1,
 }
 
+// read reads size-length bytes from conn to data.
 func read(conn *net.TCPConn, size int, data *bytes.Buffer) (err error) {
 	buffer := make([]byte, size)
 	if _, err = io.ReadFull(conn, buffer); err != nil {
@@ -73,6 +74,7 @@ func sendMessage(conn *net.TCPConn, data []byte) error {
 	return err
 }
 
+// sendHandshake sends handshake message to conn.
 func sendHandshake(conn *net.TCPConn, infoHash, peerId []byte) error {
 	data := make([]byte, 68)
 	copy(data[:28], handshakePrefix)
@@ -83,6 +85,7 @@ func sendHandshake(conn *net.TCPConn, infoHash, peerId []byte) error {
 	return err
 }
 
+// onHandshake handles the handshake response.
 func onHandshake(data []byte) (err error) {
 	if !(bytes.Equal(handshakePrefix[:20], data[:20]) && data[25]&0x10 != 0) {
 		err = errors.New("invalid handshake response")
@@ -90,6 +93,7 @@ func onHandshake(data []byte) (err error) {
 	return
 }
 
+// sendExtHandshake requests for the ut_metadata and metadata_size.
 func sendExtHandshake(conn *net.TCPConn) error {
 	data := append(
 		[]byte{EXTENDED, HANDSHAKE},
@@ -159,7 +163,7 @@ type Wire struct {
 // NewWire returns a Wire pointer.
 func NewWire() *Wire {
 	return &Wire{
-		blackList: newBlackList(),
+		blackList: newBlackList(524288),
 		queue:     newSyncedMap(),
 		requests:  make(chan Request, 256),
 		responses: make(chan Response, 256),
@@ -231,7 +235,6 @@ func (wire *Wire) fetchMetadata(r Request) {
 		read(conn, 68, data) != nil ||
 		onHandshake(data.Next(68)) != nil ||
 		sendExtHandshake(conn) != nil {
-		//fmt.Println("send hand shake error")
 		return
 	}
 

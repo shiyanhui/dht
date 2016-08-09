@@ -23,7 +23,8 @@ standard BEPs protocol. With the crawling mode, you can build another Pirate Bay
 ## Example
 
 Below is a simple spider. You can move [here](https://github.com/shiyanhui/dht/blob/master/sample)
-to see more samples.
+to see more samples. And you can also download the [binary file](https://github.com/shiyanhui/dht/files/407021/spider.zip)
+to run on your machine.
 
 ```go
 import (

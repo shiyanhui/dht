@@ -20,10 +20,10 @@ type blackList struct {
 }
 
 // newBlackList returns a blackList pointer.
-func newBlackList() *blackList {
+func newBlackList(size int) *blackList {
 	return &blackList{
 		list:         newSyncedMap(),
-		maxSize:      524288, // 2 ^ 19
+		maxSize:      size,
 		expiredAfter: time.Hour * 1,
 	}
 }
