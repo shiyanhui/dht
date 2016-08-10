@@ -2,6 +2,10 @@
 
 ![](https://raw.githubusercontent.com/shiyanhui/dht/master/doc/screen-shot.png)
 
+See the video on the [Youtube](https://www.youtube.com/watch?v=AIpeQtw22kc).
+
+## Introduction
+
 DHT implements the bittorrent DHT protocol in Go. Now it includes:
 
 - [BEP-3 (part)](http://www.bittorrent.org/beps/bep_0003.html)
@@ -11,20 +15,19 @@ DHT implements the bittorrent DHT protocol in Go. Now it includes:
 
 It contains two modes, the standard mode and the crawling mode. The standard
 mode follows the BEPs, and you can use it as a standard dht server. The crawling
-mode aims to spide as more medata info as possiple. It doesn't follow the
+mode aims to crawl as more metadata info as possiple. It doesn't follow the
 standard BEPs protocol. With the crawling mode, you can build another Pirate Bay.
 
 [bthub.io](http://bthub.io) is a BT search engine based on the crawling mode.
 
-## Install
+## Installation
 
     go get github.com/shiyanhui/dht
 
 ## Example
 
 Below is a simple spider. You can move [here](https://github.com/shiyanhui/dht/blob/master/sample)
-to see more samples. And you can also download the [binary file](https://github.com/shiyanhui/dht/files/407021/spider.zip)
-to run on your machine.
+to see more samples.
 
 ```go
 import (
@@ -53,6 +56,10 @@ func main() {
 }
 ```
 
+## Download
+
+You can download the binary file [here](https://github.com/shiyanhui/dht/files/407021/spider.zip).
+
 ## License
 
-MIT.
+MIT, read more [here](https://github.com/shiyanhui/dht/blob/master/LICENSE)
