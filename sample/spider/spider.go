@@ -7,15 +7,15 @@ import (
 	"github.com/shiyanhui/dht"
 )
 
-type File struct {
+type file struct {
 	Path   []interface{} `json:"path"`
 	Length int           `json:"length"`
 }
 
-type BitTorrent struct {
+type bitTorrent struct {
 	InfoHash string `json:"infohash"`
 	Name     string `json:"name"`
-	Files    []File `json:"files,omitempty"`
+	Files    []file `json:"files,omitempty"`
 	Length   int    `json:"length,omitempty"`
 }
 
@@ -33,20 +33,20 @@ func main() {
 				continue
 			}
 
-			bt := BitTorrent{
+			bt := bitTorrent{
 				InfoHash: hex.EncodeToString(resp.InfoHash),
 				Name:     info["name"].(string),
 			}
 
 			if v, ok := info["files"]; ok {
 				files := v.([]interface{})
-				bt.Files = make([]File, len(files))
+				bt.Files = make([]file, len(files))
 
 				for i, item := range files {
-					file := item.(map[string]interface{})
-					bt.Files[i] = File{
-						Path:   file["path"].([]interface{}),
-						Length: file["length"].(int),
+					f := item.(map[string]interface{})
+					bt.Files[i] = file{
+						Path:   f["path"].([]interface{}),
+						Length: f["length"].(int),
 					}
 				}
 			} else if _, ok := info["length"]; ok {

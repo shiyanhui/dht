@@ -1,6 +1,5 @@
 // Package dht implements the bittorrent dht protocol. For more information
 // see http://www.bittorrent.org/beps/bep_0005.html.
-
 package dht
 
 import (
@@ -18,7 +17,9 @@ var (
 )
 
 const (
+	// StandardMode follows the standard protocol
 	StandardMode = iota
+	// CrawlMode for crawling the dht network.
 	CrawlMode
 )
 
@@ -132,7 +133,7 @@ func (dht *DHT) IsStandardMode() bool {
 	return dht.Mode == StandardMode
 }
 
-// IsStandardMode returns whether mode is CrawlMode.
+// IsCrawlMode returns whether mode is CrawlMode.
 func (dht *DHT) IsCrawlMode() bool {
 	return dht.Mode == CrawlMode
 }
@@ -196,7 +197,7 @@ func (dht *DHT) id(target string) string {
 }
 
 // GetPeers returns peers who have announced having infoHash.
-func (dht *DHT) GetPeers(infoHash string) ([]*peer, error) {
+func (dht *DHT) GetPeers(infoHash string) ([]*Peer, error) {
 	if !dht.Ready {
 		return nil, errors.New("dht not ready")
 	}

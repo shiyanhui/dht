@@ -62,24 +62,24 @@ func (node *node) CompactNodeInfo() string {
 	}, "")
 }
 
-// peer represents a peer contact.
-type peer struct {
-	ip    net.IP
-	port  int
+// Peer represents a peer contact.
+type Peer struct {
+	IP    net.IP
+	Port  int
 	token string
 }
 
 // newPeer returns a new peer pointer.
-func newPeer(ip net.IP, port int, token string) *peer {
-	return &peer{
-		ip:    ip,
-		port:  port,
+func newPeer(ip net.IP, port int, token string) *Peer {
+	return &Peer{
+		IP:    ip,
+		Port:  port,
 		token: token,
 	}
 }
 
 // newPeerFromCompactIPPortInfo create a peer pointer by compact ip/port info.
-func newPeerFromCompactIPPortInfo(compactInfo, token string) (*peer, error) {
+func newPeerFromCompactIPPortInfo(compactInfo, token string) (*Peer, error) {
 	ip, port, err := decodeCompactIPPortInfo(compactInfo)
 	if err != nil {
 		return nil, err
@@ -88,10 +88,10 @@ func newPeerFromCompactIPPortInfo(compactInfo, token string) (*peer, error) {
 	return newPeer(ip, port, token), nil
 }
 
-// CompactNodeInfo returns "Compact node info".
+// CompactIPPortInfo returns "Compact node info".
 // See http://www.bittorrent.org/beps/bep_0005.html.
-func (p *peer) CompactIPPortInfo() string {
-	info, _ := encodeCompactIPPortInfo(p.ip, p.port)
+func (p *Peer) CompactIPPortInfo() string {
+	info, _ := encodeCompactIPPortInfo(p.IP, p.Port)
 	return info
 }
 
@@ -111,7 +111,7 @@ func newPeersManager(dht *DHT) *peersManager {
 }
 
 // Insert adds a peer into peersManager.
-func (pm *peersManager) Insert(infoHash string, peer *peer) {
+func (pm *peersManager) Insert(infoHash string, peer *Peer) {
 	pm.Lock()
 	if _, ok := pm.table.Get(infoHash); !ok {
 		pm.table.Set(infoHash, newKeyedDeque())
@@ -123,8 +123,8 @@ func (pm *peersManager) Insert(infoHash string, peer *peer) {
 }
 
 // GetPeers returns size-length peers who announces having infoHash.
-func (pm *peersManager) GetPeers(infoHash string, size int) []*peer {
-	peers := make([]*peer, 0, size)
+func (pm *peersManager) GetPeers(infoHash string, size int) []*Peer {
+	peers := make([]*Peer, 0, size)
 
 	v, ok := pm.table.Get(infoHash)
 	if !ok {
@@ -132,7 +132,7 @@ func (pm *peersManager) GetPeers(infoHash string, size int) []*peer {
 	}
 
 	for e := range v.(*keyedDeque).Iter() {
-		peers = append(peers, e.Value.(*peer))
+		peers = append(peers, e.Value.(*Peer))
 	}
 
 	if len(peers) > size {
@@ -141,105 +141,105 @@ func (pm *peersManager) GetPeers(infoHash string, size int) []*peer {
 	return peers
 }
 
-// kBucket represents a k-size bucket.
-type kBucket struct {
+// kbucket represents a k-size bucket.
+type kbucket struct {
 	sync.RWMutex
 	nodes, candidates *keyedDeque
 	lastChanged       time.Time
 	prefix            *bitmap
 }
 
-// newKBucket returns a new kBucket pointer.
-func newKBucket(prefix *bitmap) *kBucket {
-	kbucket := &kBucket{
+// newKBucket returns a new kbucket pointer.
+func newKBucket(prefix *bitmap) *kbucket {
+	bucket := &kbucket{
 		nodes:       newKeyedDeque(),
 		candidates:  newKeyedDeque(),
 		lastChanged: time.Now(),
 		prefix:      prefix,
 	}
-	return kbucket
+	return bucket
 }
 
 // LastChanged return the last time when it changes.
-func (kbucket *kBucket) LastChanged() time.Time {
-	kbucket.RLock()
-	defer kbucket.RUnlock()
+func (bucket *kbucket) LastChanged() time.Time {
+	bucket.RLock()
+	defer bucket.RUnlock()
 
-	return kbucket.lastChanged
+	return bucket.lastChanged
 }
 
-// RandomChildID returns a random id that has the same prefix with kbucket.
-func (kbucket *kBucket) RandomChildID() string {
-	prefixLen := kbucket.prefix.Size / 8
+// RandomChildID returns a random id that has the same prefix with bucket.
+func (bucket *kbucket) RandomChildID() string {
+	prefixLen := bucket.prefix.Size / 8
 
 	return strings.Join([]string{
-		kbucket.prefix.RawString()[:prefixLen],
+		bucket.prefix.RawString()[:prefixLen],
 		randomString(20 - prefixLen),
 	}, "")
 }
 
-// UpdateTimestamp update kbucket's last changed time..
-func (kbucket *kBucket) UpdateTimestamp() {
-	kbucket.Lock()
-	defer kbucket.Unlock()
+// UpdateTimestamp update bucket's last changed time..
+func (bucket *kbucket) UpdateTimestamp() {
+	bucket.Lock()
+	defer bucket.Unlock()
 
-	kbucket.lastChanged = time.Now()
+	bucket.lastChanged = time.Now()
 }
 
-// Insert inserts node to the kbucket. It returns whether the node is new in
-// the kbucket.
-func (kbucket *kBucket) Insert(no *node, rt *routingTable) bool {
-	isNew := !kbucket.nodes.HasKey(no.id.RawString())
+// Insert inserts node to the bucket. It returns whether the node is new in
+// the bucket.
+func (bucket *kbucket) Insert(no *node, rt *routingTable) bool {
+	isNew := !bucket.nodes.HasKey(no.id.RawString())
 
-	kbucket.nodes.Push(no.id.RawString(), no)
+	bucket.nodes.Push(no.id.RawString(), no)
 	rt.cachedNodes.Set(no.addr.String(), no)
-	rt.Touch(kbucket)
+	rt.Touch(bucket)
 
 	return isNew
 }
 
-// Replace removes node, then put kbucket.candidates.Back() to the right
-// place of kbucket.nodes.
-func (kbucket *kBucket) Replace(no *node, rt *routingTable) {
-	kbucket.nodes.Delete(no.id.RawString())
+// Replace removes node, then put bucket.candidates.Back() to the right
+// place of bucket.nodes.
+func (bucket *kbucket) Replace(no *node, rt *routingTable) {
+	bucket.nodes.Delete(no.id.RawString())
 
 	rt.cachedNodes.Delete(no.addr.String())
-	rt.Touch(kbucket)
+	rt.Touch(bucket)
 
-	if kbucket.candidates.Len() == 0 {
+	if bucket.candidates.Len() == 0 {
 		return
 	}
 
-	no = kbucket.candidates.Remove(kbucket.candidates.Back()).(*node)
+	no = bucket.candidates.Remove(bucket.candidates.Back()).(*node)
 
 	inserted := false
-	for e := range kbucket.nodes.Iter() {
+	for e := range bucket.nodes.Iter() {
 		if e.Value.(*node).lastActiveTime.After(
 			no.lastActiveTime) && !inserted {
 
-			kbucket.nodes.InsertBefore(no, e)
+			bucket.nodes.InsertBefore(no, e)
 			inserted = true
 		}
 	}
 
 	if !inserted {
-		kbucket.nodes.PushBack(no)
+		bucket.nodes.PushBack(no)
 	}
 }
 
-// Clear resets the kbucket.
-func (kbucket *kBucket) Clear() {
-	kbucket.Lock()
-	defer kbucket.Unlock()
+// Clear resets the bucket.
+func (bucket *kbucket) Clear() {
+	bucket.Lock()
+	defer bucket.Unlock()
 
-	kbucket.nodes.Clear()
-	kbucket.candidates.Clear()
-	kbucket.lastChanged = time.Now()
+	bucket.nodes.Clear()
+	bucket.candidates.Clear()
+	bucket.lastChanged = time.Now()
 }
 
-// Fresh pings the expired nodes in the kbucket.
-func (kbucket *kBucket) Fresh(dht *DHT) {
-	for e := range kbucket.nodes.Iter() {
+// Fresh pings the expired nodes in the bucket.
+func (bucket *kbucket) Fresh(dht *DHT) {
+	for e := range bucket.nodes.Iter() {
 		no := e.Value.(*node)
 		if time.Since(no.lastActiveTime) > dht.NodeExpriedAfter {
 			dht.transactionManager.ping(no)
@@ -251,14 +251,14 @@ func (kbucket *kBucket) Fresh(dht *DHT) {
 type routingTableNode struct {
 	sync.RWMutex
 	children []*routingTableNode
-	kbucket  *kBucket
+	bucket   *kbucket
 }
 
 // newRoutingTableNode returns a new routingTableNode pointer.
 func newRoutingTableNode(prefix *bitmap) *routingTableNode {
 	return &routingTableNode{
 		children: make([]*routingTableNode, 2),
-		kbucket:  newKBucket(prefix),
+		bucket:   newKBucket(prefix),
 	}
 }
 
@@ -283,20 +283,20 @@ func (tableNode *routingTableNode) SetChild(index int, c *routingTableNode) {
 	tableNode.children[index] = c
 }
 
-// KBucket returns the kbucket routingTableNode holds.
-func (tableNode *routingTableNode) KBucket() *kBucket {
+// KBucket returns the bucket routingTableNode holds.
+func (tableNode *routingTableNode) KBucket() *kbucket {
 	tableNode.RLock()
 	defer tableNode.RUnlock()
 
-	return tableNode.kbucket
+	return tableNode.bucket
 }
 
-// SetKBucket sets the kbucket.
-func (tableNode *routingTableNode) SetKBucket(kbucket *kBucket) {
+// SetKBucket sets the bucket.
+func (tableNode *routingTableNode) SetKBucket(bucket *kbucket) {
 	tableNode.Lock()
 	defer tableNode.Unlock()
 
-	tableNode.kbucket = kbucket
+	tableNode.bucket = bucket
 }
 
 // Split splits current routingTableNode and sets it's two children.
@@ -313,7 +313,7 @@ func (tableNode *routingTableNode) Split(rt *routingTable) {
 	}
 
 	tableNode.Lock()
-	tableNode.children[1].kbucket.prefix.Set(prefixLen)
+	tableNode.children[1].bucket.prefix.Set(prefixLen)
 	tableNode.Unlock()
 
 	for e := range tableNode.KBucket().nodes.Iter() {
@@ -340,7 +340,7 @@ func (tableNode *routingTableNode) Clear() {
 	defer tableNode.Unlock()
 
 	tableNode.children = make([]*routingTableNode, 2)
-	tableNode.kbucket.Clear()
+	tableNode.bucket.Clear()
 }
 
 // routingTable implements the routing table in DHT protocol.
@@ -366,15 +366,15 @@ func newRoutingTable(k int, dht *DHT) *routingTable {
 		dht:            dht,
 	}
 
-	rt.cachedKBuckets.Push(root.kbucket.prefix.String(), root.kbucket)
+	rt.cachedKBuckets.Push(root.bucket.prefix.String(), root.bucket)
 	return rt
 }
 
-// Touch updates the routing table. It will put the kbucket to the end of
-// kbucket list.
-func (rt *routingTable) Touch(kbucket *kBucket) {
-	kbucket.UpdateTimestamp()
-	rt.cachedKBuckets.Push(kbucket.prefix.String(), kbucket)
+// Touch updates the routing table. It will put the bucket to the end of
+// bucket list.
+func (rt *routingTable) Touch(bucket *kbucket) {
+	bucket.UpdateTimestamp()
+	rt.cachedKBuckets.Push(bucket.prefix.String(), bucket)
 }
 
 // Insert adds a node to routing table. It returns whether the node is new
@@ -402,12 +402,12 @@ func (rt *routingTable) Insert(nd *node) bool {
 
 			return root.KBucket().Insert(nd, rt)
 		} else if root.KBucket().prefix.Compare(nd.id, prefixLen-1) == 0 {
-			// If node has the same prefix with kbucket, split it.
+			// If node has the same prefix with bucket, split it.
 
 			root.Split(rt)
 			root = root.Child(nd.id.Bit(prefixLen - 1))
 		} else {
-			// Finally, store node as a candidate and fresh the kbucket.
+			// Finally, store node as a candidate and fresh the bucket.
 			root.KBucket().candidates.PushBack(nd)
 			if root.KBucket().candidates.Len() > rt.k {
 				root.KBucket().candidates.Remove(
@@ -451,10 +451,10 @@ func (rt *routingTable) GetNeighborCompactInfos(id *bitmap, size int) []string {
 	return infos
 }
 
-// GetNodeKBucktById returns node whose id is `id` and the kbucket it
+// GetNodeKBucktById returns node whose id is `id` and the bucket it
 // belongs to.
-func (rt *routingTable) GetNodeKBucktById(id *bitmap) (
-	nd *node, kbucket *kBucket) {
+func (rt *routingTable) GetNodeKBucktByID(id *bitmap) (
+	nd *node, bucket *kbucket) {
 
 	rt.RLock()
 	defer rt.RUnlock()
@@ -469,7 +469,7 @@ func (rt *routingTable) GetNodeKBucktById(id *bitmap) (
 			if !ok {
 				return
 			}
-			nd, kbucket = v.Value.(*node), root.KBucket()
+			nd, bucket = v.Value.(*node), root.KBucket()
 			return
 		}
 		root = next
@@ -491,9 +491,9 @@ func (rt *routingTable) GetNodeByAddress(address string) (no *node, ok bool) {
 
 // Remove deletes the node whose id is `id`.
 func (rt *routingTable) Remove(id *bitmap) {
-	if nd, kbucket := rt.GetNodeKBucktById(id); nd != nil {
+	if nd, bucket := rt.GetNodeKBucktByID(id); nd != nil {
 		rt.Lock()
-		kbucket.Replace(nd, rt)
+		bucket.Replace(nd, rt)
 		rt.Unlock()
 	}
 }
@@ -514,7 +514,7 @@ func (rt *routingTable) Clear() {
 	rt.root.Clear()
 	rt.cachedNodes.Clear()
 	rt.cachedKBuckets.Clear()
-	rt.cachedKBuckets.Push(rt.root.kbucket.prefix.String(), rt.root.kbucket)
+	rt.cachedKBuckets.Push(rt.root.bucket.prefix.String(), rt.root.bucket)
 }
 
 // Fresh sends findNode to all nodes in the expired nodes.
@@ -522,15 +522,15 @@ func (rt *routingTable) Fresh() {
 	now := time.Now()
 
 	for e := range rt.cachedKBuckets.Iter() {
-		kbucket := e.Value.(*kBucket)
-		if now.Sub(kbucket.LastChanged()) < rt.dht.KBucketExpiredAfter ||
-			kbucket.nodes.Len() == 0 {
+		bucket := e.Value.(*kbucket)
+		if now.Sub(bucket.LastChanged()) < rt.dht.KBucketExpiredAfter ||
+			bucket.nodes.Len() == 0 {
 			continue
 		}
 
-		for e := range kbucket.nodes.Iter() {
+		for e := range bucket.nodes.Iter() {
 			no := e.Value.(*node)
-			rt.dht.transactionManager.findNode(no, kbucket.RandomChildID())
+			rt.dht.transactionManager.findNode(no, bucket.RandomChildID())
 		}
 	}
 
@@ -547,7 +547,7 @@ func (rt *routingTable) Len() int {
 	return rt.cachedNodes.Len()
 }
 
-// Implemention of heap with heap.Interface.
+// Implementation of heap with heap.Interface.
 type heapItem struct {
 	distance *bitmap
 	value    interface{}

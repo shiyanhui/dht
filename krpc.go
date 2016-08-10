@@ -68,11 +68,11 @@ func (tm *tokenManager) token(addr *net.UDPAddr) string {
 }
 
 // check returns whether the token is valid.
-func (tm *tokenManager) check(addr *net.UDPAddr, token_ string) bool {
+func (tm *tokenManager) check(addr *net.UDPAddr, tokenString string) bool {
 	v, ok := tm.Get(addr.IP.String())
 	tk, _ := v.(token)
 
-	return ok && token_ == tk.data
+	return ok && tokenString == tk.data
 }
 
 // makeQuery returns a query-formed data.
@@ -148,8 +148,8 @@ func newTransactionManager(maxCursor uint64, dht *DHT) *transactionManager {
 	}
 }
 
-// genTransId generates a transaction id and returns it.
-func (tm *transactionManager) genTransId() string {
+// genTransID generates a transaction id and returns it.
+func (tm *transactionManager) genTransID() string {
 	tm.Lock()
 	defer tm.Unlock()
 
@@ -187,8 +187,8 @@ func (tm *transactionManager) insert(trans *transaction) {
 }
 
 // delete removes a transaction from transactionManager.
-func (tm *transactionManager) delete(transId string) {
-	v, ok := tm.transactions.Get(transId)
+func (tm *transactionManager) delete(transID string) {
+	v, ok := tm.transactions.Get(transID)
 	if !ok {
 		return
 	}
@@ -224,9 +224,9 @@ func (tm *transactionManager) transaction(
 	return v.(*transaction)
 }
 
-// getByTransId returns a transaction by transId.
-func (tm *transactionManager) getByTransId(transId string) *transaction {
-	return tm.transaction(transId, 0)
+// getByTransID returns a transaction by transID.
+func (tm *transactionManager) getByTransID(transID string) *transaction {
+	return tm.transaction(transID, 0)
 }
 
 // getByIndex returns a transaction by indexed key.
@@ -237,9 +237,9 @@ func (tm *transactionManager) getByIndex(index string) *transaction {
 // transaction gets the proper transaction with whose id is transId and
 // address is addr.
 func (tm *transactionManager) filterOne(
-	transId string, addr *net.UDPAddr) *transaction {
+	transID string, addr *net.UDPAddr) *transaction {
 
-	trans := tm.getByTransId(transId)
+	trans := tm.getByTransID(transID)
 	if trans == nil || trans.node.addr.String() != addr.String() {
 		return nil
 	}
@@ -251,8 +251,8 @@ func (tm *transactionManager) filterOne(
 // When timeout, it will retry `try - 1` times, which means it will query
 // `try` times totally.
 func (tm *transactionManager) query(q *query, try int) {
-	transId := q.data["t"].(string)
-	trans := tm.newTransaction(transId, q)
+	transID := q.data["t"].(string)
+	trans := tm.newTransaction(transID, q)
 
 	tm.insert(trans)
 	defer tm.delete(trans.id)
@@ -300,7 +300,7 @@ func (tm *transactionManager) sendQuery(
 		return
 	}
 
-	data := makeQuery(tm.genTransId(), queryType, a)
+	data := makeQuery(tm.genTransID(), queryType, a)
 	tm.queryChan <- &query{
 		node: no,
 		data: data,
@@ -465,14 +465,14 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 		var nodes string
 
 		if dht.IsStandardMode() {
-			targetId := newBitmapFromString(target)
+			targetID := newBitmapFromString(target)
 
-			no, _ := dht.routingTable.GetNodeKBucktById(targetId)
+			no, _ := dht.routingTable.GetNodeKBucktByID(targetID)
 			if no != nil {
 				nodes = no.CompactNodeInfo()
 			} else {
 				nodes = strings.Join(
-					dht.routingTable.GetNeighborCompactInfos(targetId, dht.K),
+					dht.routingTable.GetNeighborCompactInfos(targetID, dht.K),
 					"",
 				)
 			}
@@ -546,8 +546,8 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 			return
 		}
 
-		if implied_port, ok := a["implied_port"]; ok &&
-			implied_port.(int) != 0 {
+		if impliedPort, ok := a["implied_port"]; ok &&
+			impliedPort.(int) != 0 {
 
 			port = addr.Port
 		}
@@ -603,13 +603,13 @@ func findOn(dht *DHT, r map[string]interface{}, target *bitmap,
 		return nil
 	}
 
-	targetId := target.RawString()
+	targetID := target.RawString()
 	for _, no := range dht.routingTable.GetNeighbors(target, dht.K) {
 		switch queryType {
 		case findNodeType:
-			dht.transactionManager.findNode(no, targetId)
+			dht.transactionManager.findNode(no, targetID)
 		case getPeersType:
-			dht.transactionManager.getPeers(no, targetId)
+			dht.transactionManager.getPeers(no, targetID)
 		default:
 			panic("invalid find type")
 		}

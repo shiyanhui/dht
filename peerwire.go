@@ -13,16 +13,23 @@ import (
 )
 
 const (
+	// REQUEST represents request message type
 	REQUEST = iota
+	// DATA represents data message type
 	DATA
+	// REJECT represents reject message type
 	REJECT
 )
 
 const (
-	BLOCK             = 16384 // 2 ^ 14
-	MAX_METADATA_SIZE = BLOCK * 1000
-	EXTENDED          = 20
-	HANDSHAKE         = 0
+	// BLOCK is 2 ^ 14
+	BLOCK = 16384
+	// MaxMetadataSize represents the max medata it can accept
+	MaxMetadataSize = BLOCK * 1000
+	// EXTENDED represents it is a extended message
+	EXTENDED = 20
+	// HANDSHAKE represents handshake bit
+	HANDSHAKE = 0
 )
 
 var handshakePrefix = []byte{
@@ -65,7 +72,7 @@ func readMessage(conn *net.TCPConn, data *bytes.Buffer) (
 
 // sendMessage sends data to the connection.
 func sendMessage(conn *net.TCPConn, data []byte) error {
-	var length int32 = int32(len(data))
+	length := int32(len(data))
 
 	buffer := bytes.NewBuffer(nil)
 	binary.Write(buffer, binary.BigEndian, length)
@@ -75,11 +82,11 @@ func sendMessage(conn *net.TCPConn, data []byte) error {
 }
 
 // sendHandshake sends handshake message to conn.
-func sendHandshake(conn *net.TCPConn, infoHash, peerId []byte) error {
+func sendHandshake(conn *net.TCPConn, infoHash, peerID []byte) error {
 	data := make([]byte, 68)
 	copy(data[:28], handshakePrefix)
 	copy(data[28:48], infoHash)
-	copy(data[48:], peerId)
+	copy(data[48:], peerID)
 
 	_, err := conn.Write(data)
 	return err
@@ -133,7 +140,7 @@ func getUTMetaSize(data []byte) (
 	utMetadata = m["ut_metadata"].(int)
 	metadataSize = dict["metadata_size"].(int)
 
-	if metadataSize > MAX_METADATA_SIZE {
+	if metadataSize > MaxMetadataSize {
 		err = errors.New("metadata_size too long")
 	}
 	return
@@ -264,7 +271,7 @@ func (wire *Wire) fetchMetadata(r Request) {
 
 		switch msgType {
 		case EXTENDED:
-			extendedId, err := data.ReadByte()
+			extendedID, err := data.ReadByte()
 			if err != nil {
 				return
 			}
@@ -274,7 +281,7 @@ func (wire *Wire) fetchMetadata(r Request) {
 				return
 			}
 
-			if extendedId == 0 {
+			if extendedID == 0 {
 				if pieces != nil {
 					return
 				}
