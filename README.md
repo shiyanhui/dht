@@ -4,6 +4,8 @@
 
 See the video on the [Youtube](https://www.youtube.com/watch?v=AIpeQtw22kc).
 
+[中文版README](https://github.com/shiyanhui/dht/blob/master/README_CN.md)
+
 ## Introduction
 
 DHT implements the bittorrent DHT protocol in Go. Now it includes:
@@ -58,7 +60,7 @@ func main() {
 
 ## Download
 
-You can download the binary file [here](https://github.com/shiyanhui/dht/files/407021/spider.zip).
+You can download the demo compiled binary file [here](https://github.com/shiyanhui/dht/files/407021/spider.zip).
 
 ## License
 
