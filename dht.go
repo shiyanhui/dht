@@ -153,6 +153,7 @@ func (dht *DHT) init() {
 		dht.MaxTransactionCursor, dht)
 
 	go dht.transactionManager.run()
+	go dht.tokenManager.clear()
 	go dht.blackList.clear()
 }
 

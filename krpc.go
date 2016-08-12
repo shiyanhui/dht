@@ -67,10 +67,30 @@ func (tm *tokenManager) token(addr *net.UDPAddr) string {
 	return v.(token).data
 }
 
+// clear removes expired tokens.
+func (tm *tokenManager) clear() {
+	for _ = range time.Tick(time.Minute * 3) {
+		keys := make([]interface{}, 0, 100)
+
+		for item := range tm.Iter() {
+			if time.Now().Sub(item.val.(token).createTime) > tm.expiredAfter {
+				keys = append(keys, item.key)
+			}
+		}
+
+		tm.DeleteMulti(keys)
+	}
+}
+
 // check returns whether the token is valid.
 func (tm *tokenManager) check(addr *net.UDPAddr, tokenString string) bool {
-	v, ok := tm.Get(addr.IP.String())
+	key := addr.IP.String()
+	v, ok := tm.Get(key)
 	tk, _ := v.(token)
+
+	if ok {
+		tm.Delete(key)
+	}
 
 	return ok && tokenString == tk.data
 }
