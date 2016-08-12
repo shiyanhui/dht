@@ -36,7 +36,7 @@ import (
 )
 
 func main() {
-    downloader := dht.NewWire()
+    downloader := dht.NewWire(65536)
     go func() {
         // once we got the request result
         for resp := range downloader.Response() {

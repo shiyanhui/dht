@@ -168,9 +168,9 @@ type Wire struct {
 }
 
 // NewWire returns a Wire pointer.
-func NewWire() *Wire {
+func NewWire(blackListMaxSize int) *Wire {
 	return &Wire{
-		blackList: newBlackList(524288),
+		blackList: newBlackList(blackListMaxSize),
 		queue:     newSyncedMap(),
 		requests:  make(chan Request, 256),
 		responses: make(chan Response, 256),

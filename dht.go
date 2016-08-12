@@ -39,6 +39,7 @@ type Config struct {
 	OnGetPeers           func(string, string, int)
 	OnAnnouncePeer       func(string, string, int)
 	BlockedIPs           []string
+	BlackListMaxSize     int
 	Mode                 int
 	Try                  int
 }
@@ -62,6 +63,7 @@ func NewStandardConfig() *Config {
 		MaxTransactionCursor: 4294967295, // 2 ^ 32 - 1
 		MaxNodes:             5000,
 		BlockedIPs:           make([]string, 0),
+		BlackListMaxSize:     65536,
 		Try:                  2,
 		Mode:                 StandardMode,
 	}
@@ -107,7 +109,7 @@ func New(config *Config) *DHT {
 	d := &DHT{
 		Config:    config,
 		node:      node,
-		blackList: newBlackList(524288),
+		blackList: newBlackList(config.BlackListMaxSize),
 	}
 
 	for _, ip := range config.BlockedIPs {

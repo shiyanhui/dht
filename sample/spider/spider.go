@@ -20,7 +20,7 @@ type bitTorrent struct {
 }
 
 func main() {
-	w := dht.NewWire()
+	w := dht.NewWire(65536)
 	go func() {
 		for resp := range w.Response() {
 			metadata, err := dht.Decode(resp.MetadataInfo)
