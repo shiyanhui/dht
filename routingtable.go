@@ -188,23 +188,20 @@ func (bucket *kbucket) UpdateTimestamp() {
 
 // Insert inserts node to the bucket. It returns whether the node is new in
 // the bucket.
-func (bucket *kbucket) Insert(no *node, rt *routingTable) bool {
+func (bucket *kbucket) Insert(no *node) bool {
 	isNew := !bucket.nodes.HasKey(no.id.RawString())
 
 	bucket.nodes.Push(no.id.RawString(), no)
-	rt.cachedNodes.Set(no.addr.String(), no)
-	rt.Touch(bucket)
+	bucket.UpdateTimestamp()
 
 	return isNew
 }
 
 // Replace removes node, then put bucket.candidates.Back() to the right
 // place of bucket.nodes.
-func (bucket *kbucket) Replace(no *node, rt *routingTable) {
+func (bucket *kbucket) Replace(no *node) {
 	bucket.nodes.Delete(no.id.RawString())
-
-	rt.cachedNodes.Delete(no.addr.String())
-	rt.Touch(bucket)
+	bucket.UpdateTimestamp()
 
 	if bucket.candidates.Len() == 0 {
 		return
@@ -225,16 +222,6 @@ func (bucket *kbucket) Replace(no *node, rt *routingTable) {
 	if !inserted {
 		bucket.nodes.PushBack(no)
 	}
-}
-
-// Clear resets the bucket.
-func (bucket *kbucket) Clear() {
-	bucket.Lock()
-	defer bucket.Unlock()
-
-	bucket.nodes.Clear()
-	bucket.candidates.Clear()
-	bucket.lastChanged = time.Now()
 }
 
 // Fresh pings the expired nodes in the bucket.
@@ -300,7 +287,7 @@ func (tableNode *routingTableNode) SetKBucket(bucket *kbucket) {
 }
 
 // Split splits current routingTableNode and sets it's two children.
-func (tableNode *routingTableNode) Split(rt *routingTable) {
+func (tableNode *routingTableNode) Split() {
 	prefixLen := tableNode.KBucket().prefix.Size
 
 	if prefixLen == maxPrefixLength {
@@ -326,21 +313,9 @@ func (tableNode *routingTableNode) Split(rt *routingTable) {
 		tableNode.Child(nd.id.Bit(prefixLen)).KBucket().candidates.PushBack(nd)
 	}
 
-	rt.cachedKBuckets.Delete(tableNode.KBucket().prefix.String())
-	// tableNode.SetKBucket(nil)
-
 	for i := 0; i < 2; i++ {
-		rt.Touch(tableNode.Child(i).KBucket())
+		tableNode.Child(i).KBucket().UpdateTimestamp()
 	}
-}
-
-// Clear resets the routingTableNode.
-func (tableNode *routingTableNode) Clear() {
-	tableNode.Lock()
-	defer tableNode.Unlock()
-
-	tableNode.children = make([]*routingTableNode, 2)
-	tableNode.bucket.Clear()
 }
 
 // routingTable implements the routing table in DHT protocol.
@@ -370,13 +345,6 @@ func newRoutingTable(k int, dht *DHT) *routingTable {
 	return rt
 }
 
-// Touch updates the routing table. It will put the bucket to the end of
-// bucket list.
-func (rt *routingTable) Touch(bucket *kbucket) {
-	bucket.UpdateTimestamp()
-	rt.cachedKBuckets.Push(bucket.prefix.String(), bucket)
-}
-
 // Insert adds a node to routing table. It returns whether the node is new
 // in the routingtable.
 func (rt *routingTable) Insert(nd *node) bool {
@@ -388,7 +356,10 @@ func (rt *routingTable) Insert(nd *node) bool {
 		return false
 	}
 
-	var next *routingTableNode
+	var (
+		next   *routingTableNode
+		bucket *kbucket
+	)
 	root := rt.root
 
 	for prefixLen := 1; prefixLen <= maxPrefixLength; prefixLen++ {
@@ -400,11 +371,26 @@ func (rt *routingTable) Insert(nd *node) bool {
 		} else if root.KBucket().nodes.Len() < rt.k ||
 			root.KBucket().nodes.HasKey(nd.id.RawString()) {
 
-			return root.KBucket().Insert(nd, rt)
+			bucket = root.KBucket()
+			isNew := bucket.Insert(nd)
+
+			rt.cachedNodes.Set(nd.addr.String(), nd)
+			rt.cachedKBuckets.Push(bucket.prefix.String(), bucket)
+
+			return isNew
 		} else if root.KBucket().prefix.Compare(nd.id, prefixLen-1) == 0 {
 			// If node has the same prefix with bucket, split it.
 
-			root.Split(rt)
+			root.Split()
+
+			rt.cachedKBuckets.Delete(root.KBucket().prefix.String())
+			root.SetKBucket(nil)
+
+			for i := 0; i < 2; i++ {
+				bucket = root.Child(i).KBucket()
+				rt.cachedKBuckets.Push(bucket.prefix.String(), bucket)
+			}
+
 			root = root.Child(nd.id.Bit(prefixLen - 1))
 		} else {
 			// Finally, store node as a candidate and fresh the bucket.
@@ -492,9 +478,9 @@ func (rt *routingTable) GetNodeByAddress(address string) (no *node, ok bool) {
 // Remove deletes the node whose id is `id`.
 func (rt *routingTable) Remove(id *bitmap) {
 	if nd, bucket := rt.GetNodeKBucktByID(id); nd != nil {
-		rt.Lock()
-		bucket.Replace(nd, rt)
-		rt.Unlock()
+		bucket.Replace(nd)
+		rt.cachedNodes.Delete(nd.addr.String())
+		rt.cachedKBuckets.Push(bucket.prefix.String(), bucket)
 	}
 }
 
@@ -506,20 +492,10 @@ func (rt *routingTable) RemoveByAddr(address string) {
 	}
 }
 
-// Clear resets the routingTable.
-func (rt *routingTable) Clear() {
-	rt.Lock()
-	defer rt.Unlock()
-
-	rt.root.Clear()
-	rt.cachedNodes.Clear()
-	rt.cachedKBuckets.Clear()
-	rt.cachedKBuckets.Push(rt.root.bucket.prefix.String(), rt.root.bucket)
-}
-
 // Fresh sends findNode to all nodes in the expired nodes.
 func (rt *routingTable) Fresh() {
 	now := time.Now()
+    queue := newSyncedList()
 
 	for e := range rt.cachedKBuckets.Iter() {
 		bucket := e.Value.(*kbucket)
@@ -531,12 +507,13 @@ func (rt *routingTable) Fresh() {
 		for e := range bucket.nodes.Iter() {
 			no := e.Value.(*node)
 			rt.dht.transactionManager.findNode(no, bucket.RandomChildID())
+            queue.PushBack(no)
 		}
 	}
 
-	if rt.dht.IsCrawlMode() {
-		rt.Clear()
-	}
+    for e := range queue.Iter() {
+        rt.Remove(e.Value.(*node).id)
+    }
 }
 
 // Len returns the number of nodes in table.

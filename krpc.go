@@ -57,14 +57,15 @@ func (tm *tokenManager) token(addr *net.UDPAddr) string {
 	tk, _ := v.(token)
 
 	if !ok || time.Now().Sub(tk.createTime) > tm.expiredAfter {
-		tm.Set(addr.IP.String(), token{
+        tk = token{
 			data:       randomString(5),
 			createTime: time.Now(),
-		})
+		}
+
+		tm.Set(addr.IP.String(), tk)
 	}
 
-	v, _ = tm.Get(addr.IP.String())
-	return v.(token).data
+	return tk.data
 }
 
 // clear removes expired tokens.
