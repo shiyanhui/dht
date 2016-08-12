@@ -9,6 +9,7 @@ func TestBitmap(t *testing.T) {
 	b := newBitmapFrom(a, 10)
 	c := newBitmapFromBytes([]byte{48, 49, 50, 51, 52, 53, 54, 55, 56, 57})
 	d := newBitmapFromString("0123456789")
+	e := newBitmap(10)
 
 	// Bit
 	for i := 0; i < a.Size; i++ {
@@ -40,6 +41,18 @@ func TestBitmap(t *testing.T) {
 	}
 
 	// String
+	if e.String() != "0000000000" {
+		t.Fail()
+	}
+	e.Set(9)
+	if e.String() != "0000000001" {
+		t.Fail()
+	}
+	e.Set(2)
+	if e.String() != "0010000001" {
+		t.Fail()
+	}
+
 	a.Set(0)
 	a.Set(5)
 	a.Set(8)

@@ -147,11 +147,11 @@ func (bitmap *bitmap) String() string {
 	buff := make([]string, div+mod)
 
 	for i := 0; i < div; i++ {
-		buff[i] = fmt.Sprintf("%04b", bitmap.data[i])
+		buff[i] = fmt.Sprintf("%08b", bitmap.data[i])
 	}
 
 	for i := div; i < div+mod; i++ {
-		buff[i] = fmt.Sprintf("%01b", bitmap.Bit(div*8+(i-div)))
+		buff[i] = fmt.Sprintf("%1b", bitmap.Bit(div*8+(i-div)))
 	}
 
 	return strings.Join(buff, "")
