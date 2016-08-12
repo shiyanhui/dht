@@ -60,6 +60,12 @@ func main() {
 
 这个是已经编译好的Demo二进制文件，你可以到这里[下载](https://github.com/shiyanhui/dht/files/407021/spider.zip)。
 
+## TODO
+
+- [ ] NAT穿透，在局域网内也能够运行
+- [ ] 完整地实现BEP-3，这样不但能够下载种子，也能够下载资源
+- [ ] 优化
+
 ## Blog
 
 你可以在[这里](https://github.com/shiyanhui/dht/wiki)看到DHT Spider教程。

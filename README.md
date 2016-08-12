@@ -62,6 +62,12 @@ func main() {
 
 You can download the demo compiled binary file [here](https://github.com/shiyanhui/dht/files/407021/spider.zip).
 
+## TODO
+
+- [ ] NAT Traversal.
+- [ ] Implements the full BEP-3.
+- [ ] Optimization.
+
 ## License
 
 MIT, read more [here](https://github.com/shiyanhui/dht/blob/master/LICENSE)
