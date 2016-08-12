@@ -57,7 +57,7 @@ func (tm *tokenManager) token(addr *net.UDPAddr) string {
 	tk, _ := v.(token)
 
 	if !ok || time.Now().Sub(tk.createTime) > tm.expiredAfter {
-        tk = token{
+		tk = token{
 			data:       randomString(5),
 			createTime: time.Now(),
 		}

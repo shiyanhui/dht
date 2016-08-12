@@ -495,7 +495,7 @@ func (rt *routingTable) RemoveByAddr(address string) {
 // Fresh sends findNode to all nodes in the expired nodes.
 func (rt *routingTable) Fresh() {
 	now := time.Now()
-    queue := newSyncedList()
+	queue := newSyncedList()
 
 	for e := range rt.cachedKBuckets.Iter() {
 		bucket := e.Value.(*kbucket)
@@ -507,13 +507,13 @@ func (rt *routingTable) Fresh() {
 		for e := range bucket.nodes.Iter() {
 			no := e.Value.(*node)
 			rt.dht.transactionManager.findNode(no, bucket.RandomChildID())
-            queue.PushBack(no)
+			queue.PushBack(no)
 		}
 	}
 
-    for e := range queue.Iter() {
-        rt.Remove(e.Value.(*node).id)
-    }
+	for e := range queue.Iter() {
+		rt.Remove(e.Value.(*node).id)
+	}
 }
 
 // Len returns the number of nodes in table.
