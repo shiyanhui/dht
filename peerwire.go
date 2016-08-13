@@ -39,6 +39,7 @@ var handshakePrefix = []byte{
 
 // read reads size-length bytes from conn to data.
 func read(conn *net.TCPConn, size int, data *bytes.Buffer) error {
+	conn.SetReadDeadline(time.Now().Add(time.Second * 15))
 	n, err := io.CopyN(data, conn, int64(size))
 	if err != nil || n != int64(size) {
 		return errors.New("read error")
