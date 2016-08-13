@@ -119,7 +119,12 @@ func (pm *peersManager) Insert(infoHash string, peer *Peer) {
 	pm.Unlock()
 
 	v, _ := pm.table.Get(infoHash)
-	v.(*keyedDeque).Push(peer.CompactIPPortInfo(), peer)
+	queue := v.(*keyedDeque)
+
+	queue.Push(peer.CompactIPPortInfo(), peer)
+	if queue.Len() > pm.dht.K {
+		queue.Remove(queue.Front())
+	}
 }
 
 // GetPeers returns size-length peers who announces having infoHash.
@@ -326,6 +331,7 @@ type routingTable struct {
 	cachedNodes    *syncedMap
 	cachedKBuckets *keyedDeque
 	dht            *DHT
+	clearQueue     *syncedList
 }
 
 // newRoutingTable returns a new routingTable pointer.
@@ -339,6 +345,7 @@ func newRoutingTable(k int, dht *DHT) *routingTable {
 		cachedNodes:    newSyncedMap(),
 		cachedKBuckets: newKeyedDeque(),
 		dht:            dht,
+		clearQueue:     newSyncedList(),
 	}
 
 	rt.cachedKBuckets.Push(root.bucket.prefix.String(), root.bucket)
@@ -495,7 +502,6 @@ func (rt *routingTable) RemoveByAddr(address string) {
 // Fresh sends findNode to all nodes in the expired nodes.
 func (rt *routingTable) Fresh() {
 	now := time.Now()
-	queue := newSyncedList()
 
 	for e := range rt.cachedKBuckets.Iter() {
 		bucket := e.Value.(*kbucket)
@@ -507,13 +513,17 @@ func (rt *routingTable) Fresh() {
 		for e := range bucket.nodes.Iter() {
 			no := e.Value.(*node)
 			rt.dht.transactionManager.findNode(no, bucket.RandomChildID())
-			queue.PushBack(no)
+			rt.clearQueue.PushBack(no)
 		}
 	}
 
-	for e := range queue.Iter() {
-		rt.Remove(e.Value.(*node).id)
+	if rt.dht.IsCrawlMode() {
+		for e := range rt.clearQueue.Iter() {
+			rt.Remove(e.Value.(*node).id)
+		}
 	}
+
+	rt.clearQueue.Clear()
 }
 
 // Len returns the number of nodes in table.

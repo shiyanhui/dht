@@ -38,17 +38,12 @@ var handshakePrefix = []byte{
 }
 
 // read reads size-length bytes from conn to data.
-func read(conn *net.TCPConn, size int, data *bytes.Buffer) (err error) {
-	buffer := make([]byte, size)
-	if _, err = io.ReadFull(conn, buffer); err != nil {
-		return
-	}
-
-	n, err := data.Write(buffer)
-	if err != nil || n != size {
+func read(conn *net.TCPConn, size int, data *bytes.Buffer) error {
+	n, err := io.CopyN(data, conn, int64(size))
+	if err != nil || n != int64(size) {
 		return errors.New("read error")
 	}
-	return
+	return nil
 }
 
 // readMessage gets a message from the tcp connection.
@@ -215,11 +210,22 @@ func (wire *Wire) requestPieces(
 
 		sendMessage(conn, buffer[:length])
 	}
+	buffer = nil
 }
 
 // fetchMetadata fetchs medata info accroding to infohash from dht.
 func (wire *Wire) fetchMetadata(r Request) {
+	var (
+		length       int
+		msgType      byte
+		piecesNum    int
+		pieces       [][]byte
+		utMetadata   int
+		metadataSize int
+	)
+
 	defer func() {
+		pieces = nil
 		recover()
 	}()
 
@@ -244,15 +250,6 @@ func (wire *Wire) fetchMetadata(r Request) {
 		sendExtHandshake(conn) != nil {
 		return
 	}
-
-	var (
-		length       int
-		msgType      byte
-		pieces       [][]byte
-		piecesNum    int
-		utMetadata   int
-		metadataSize int
-	)
 
 	for {
 		length, err = readMessage(conn, data)

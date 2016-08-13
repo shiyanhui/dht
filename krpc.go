@@ -573,7 +573,9 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 			port = addr.Port
 		}
 
-		dht.peersManager.Insert(infoHash, newPeer(addr.IP, port, token))
+		if dht.IsStandardMode() {
+			dht.peersManager.Insert(infoHash, newPeer(addr.IP, port, token))
+		}
 
 		send(dht.conn, addr, makeResponse(t, map[string]interface{}{
 			"id": dht.id(id),

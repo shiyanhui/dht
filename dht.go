@@ -25,9 +25,14 @@ const (
 
 // Config represents the configure of dht.
 type Config struct {
-	K                    int
-	KBucketSize          int
-	Network              string
+	// in mainline dht, k = 8
+	K int
+	// for crawling mode, we put all nodes in one bucket, so KBucketSize may
+	// not be K
+	KBucketSize int
+	// candidates are udp, udp4, udp6
+	Network string
+	// format is `ip:port`
 	Address              string
 	PrimeNodes           []string
 	KBucketExpiredAfter  time.Duration
