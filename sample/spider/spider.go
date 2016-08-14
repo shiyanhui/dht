@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/hex"
-	"encoding/json"
-	"fmt"
+	//	"encoding/json"
+	//	"fmt"
 	"github.com/shiyanhui/dht"
+	"net/http"
+	_ "net/http/pprof"
 )
 
 type file struct {
@@ -20,6 +22,10 @@ type bitTorrent struct {
 }
 
 func main() {
+	go func() {
+		http.ListenAndServe(":6060", nil)
+	}()
+
 	w := dht.NewWire(65536)
 	go func() {
 		for resp := range w.Response() {
@@ -53,10 +59,10 @@ func main() {
 				bt.Length = info["length"].(int)
 			}
 
-			data, err := json.Marshal(bt)
-			if err == nil {
-				fmt.Printf("%s\n\n", data)
-			}
+			//	data, err := json.Marshal(bt)
+			//	if err == nil {
+			//		fmt.Printf("%s\n\n", data)
+			//	}
 		}
 	}()
 	go w.Run()

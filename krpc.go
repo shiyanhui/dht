@@ -128,6 +128,8 @@ func makeError(t string, errCode int, errMsg string) map[string]interface{} {
 func send(conn *net.UDPConn, addr *net.UDPAddr,
 	data map[string]interface{}) error {
 
+	sendNum.Add(1)
+
 	_, err := conn.WriteToUDP([]byte(Encode(data)), addr)
 	return err
 }
@@ -421,6 +423,8 @@ func parseMessage(data interface{}) (map[string]interface{}, error) {
 func handleRequest(dht *DHT, addr *net.UDPAddr,
 	response map[string]interface{}) (success bool) {
 
+	requestNum.Add(1)
+
 	t := response["t"].(string)
 
 	if err := parseKeys(
@@ -640,6 +644,8 @@ func findOn(dht *DHT, r map[string]interface{}, target *bitmap,
 func handleResponse(dht *DHT, addr *net.UDPAddr,
 	response map[string]interface{}) (success bool) {
 
+	responseNum.Add(1)
+
 	t := response["t"].(string)
 
 	trans := dht.transactionManager.filterOne(t, addr)
@@ -724,6 +730,8 @@ func handleResponse(dht *DHT, addr *net.UDPAddr,
 // handleError handles errors received from udp.
 func handleError(dht *DHT, addr *net.UDPAddr,
 	response map[string]interface{}) (success bool) {
+
+	errorNum.Add(1)
 
 	if err := parseKey(response, "e", "list"); err != nil {
 		return

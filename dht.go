@@ -5,8 +5,17 @@ package dht
 import (
 	"encoding/hex"
 	"errors"
+	"expvar"
+	log "github.com/Sirupsen/logrus"
 	"net"
 	"time"
+)
+
+var (
+	requestNum  = expvar.NewInt("requestNum")
+	responseNum = expvar.NewInt("responseNum")
+	errorNum    = expvar.NewInt("errorNum")
+	sendNum     = expvar.NewInt("sendNum")
 )
 
 const (
@@ -260,6 +269,13 @@ func (dht *DHT) Run() {
 		case pkt = <-packetChan:
 			go handle(dht, pkt)
 		case <-tick:
+			log.WithFields(log.Fields{
+				"requestNum":  requestNum,
+				"responseNum": responseNum,
+				"errorNum":    errorNum,
+				"sendNum":     sendNum,
+			}).Info("status")
+
 			if dht.routingTable.Len() == 0 {
 				go dht.join()
 			} else if dht.transactionManager.len() == 0 {
