@@ -5,15 +5,8 @@ package dht
 import (
 	"encoding/hex"
 	"errors"
-	"expvar"
 	"net"
 	"time"
-)
-
-var (
-	requestNum  = expvar.NewInt("requestNum")
-	responseNum = expvar.NewInt("responseNum")
-	sendNum     = expvar.NewInt("sendInt")
 )
 
 const (
