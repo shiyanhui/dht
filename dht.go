@@ -26,20 +26,39 @@ type Config struct {
 	// candidates are udp, udp4, udp6
 	Network string
 	// format is `ip:port`
-	Address              string
-	PrimeNodes           []string
-	KBucketExpiredAfter  time.Duration
-	NodeExpriedAfter     time.Duration
-	CheckKBucketPeriod   time.Duration
-	TokenExpiredAfter    time.Duration
+	Address string
+	// the prime nodes through which we can join in dht network
+	PrimeNodes []string
+	// the kbucket expired duration
+	KBucketExpiredAfter time.Duration
+	// the node expired duration
+	NodeExpriedAfter time.Duration
+	// how long it checks whether the bucket is expired
+	CheckKBucketPeriod time.Duration
+	// peer token expired duration
+	TokenExpiredAfter time.Duration
+	// the max transaction id
 	MaxTransactionCursor uint64
-	MaxNodes             int
-	OnGetPeers           func(string, string, int)
-	OnAnnouncePeer       func(string, string, int)
-	BlockedIPs           []string
-	BlackListMaxSize     int
-	Mode                 int
-	Try                  int
+	// how many nodes routing table can hold
+	MaxNodes int
+	// callback when got get_peers request
+	OnGetPeers func(string, string, int)
+	// callback when got announce_peer request
+	OnAnnouncePeer func(string, string, int)
+	// blcoked ips
+	BlockedIPs []string
+	// blacklist size
+	BlackListMaxSize int
+	// StandardMode or CrawlMode
+	Mode int
+	// the times it tries when send fails
+	Try int
+	// the size of packet need to be dealt with
+	PacketJobLimit int
+	// the size of packet handler
+	PacketWorkerLimit int
+	// the nodes num to be fresh in a kbucket
+	RefreshNodeNum int
 }
 
 // NewStandardConfig returns a Config pointer with default values.
@@ -64,6 +83,9 @@ func NewStandardConfig() *Config {
 		BlackListMaxSize:     65536,
 		Try:                  2,
 		Mode:                 StandardMode,
+		PacketJobLimit:       1024,
+		PacketWorkerLimit:    256,
+		RefreshNodeNum:       8,
 	}
 }
 
@@ -75,6 +97,7 @@ func NewCrawlConfig() *Config {
 	config.CheckKBucketPeriod = time.Second * 5
 	config.KBucketSize = 2147483647 // 2 ^ 31 - 1
 	config.Mode = CrawlMode
+	config.RefreshNodeNum = 256
 
 	return config
 }
@@ -90,6 +113,8 @@ type DHT struct {
 	tokenManager       *tokenManager
 	blackList          *blackList
 	Ready              bool
+	packets            chan packet
+	workerTokens       chan struct{}
 }
 
 // New returns a DHT pointer. If config is nil, then config will be set to
@@ -105,9 +130,11 @@ func New(config *Config) *DHT {
 	}
 
 	d := &DHT{
-		Config:    config,
-		node:      node,
-		blackList: newBlackList(config.BlackListMaxSize),
+		Config:       config,
+		node:         node,
+		blackList:    newBlackList(config.BlackListMaxSize),
+		packets:      make(chan packet, config.PacketJobLimit),
+		workerTokens: make(chan struct{}, config.PacketWorkerLimit),
 	}
 
 	for _, ip := range config.BlockedIPs {
@@ -119,8 +146,8 @@ func New(config *Config) *DHT {
 			d.blackList.insert(ip, -1)
 		}
 
-		ip := getRemoteIP()
-		if ip != "" {
+		ip, err := getRemoteIP()
+		if err != nil {
 			d.blackList.insert(ip, -1)
 		}
 	}()
@@ -174,16 +201,16 @@ func (dht *DHT) join() {
 }
 
 // listen receives message from udp.
-func (dht *DHT) listen(packetChan chan packet) {
+func (dht *DHT) listen() {
 	go func() {
-		buff := make([]byte, 4096)
+		buff := make([]byte, 8192)
 		for {
 			n, raddr, err := dht.conn.ReadFromUDP(buff)
 			if err != nil {
 				continue
 			}
 
-			packetChan <- packet{buff[:n], raddr}
+			dht.packets <- packet{buff[:n], raddr}
 		}
 	}()
 }
@@ -194,7 +221,7 @@ func (dht *DHT) id(target string) string {
 	if dht.IsStandardMode() || target == "" {
 		return dht.node.id.RawString()
 	}
-	return target[:10] + dht.node.id.RawString()[:10]
+	return target[:15] + dht.node.id.RawString()[15:]
 }
 
 // GetPeers returns peers who have announced having infoHash.
@@ -244,24 +271,22 @@ func (dht *DHT) GetPeers(infoHash string) ([]*Peer, error) {
 
 // Run starts the dht.
 func (dht *DHT) Run() {
-	var pkt packet
-
-	packetChan := make(chan packet)
-	tick := time.Tick(dht.CheckKBucketPeriod)
-
 	dht.init()
-	dht.listen(packetChan)
+	dht.listen()
 	dht.join()
 
 	dht.Ready = true
 
+	var pkt packet
+	tick := time.Tick(dht.CheckKBucketPeriod)
+
 	for {
 		select {
-		case pkt = <-packetChan:
-			go handle(dht, pkt)
+		case pkt = <-dht.packets:
+			handle(dht, pkt)
 		case <-tick:
 			if dht.routingTable.Len() == 0 {
-				go dht.join()
+				dht.join()
 			} else if dht.transactionManager.len() == 0 {
 				go dht.routingTable.Fresh()
 			}

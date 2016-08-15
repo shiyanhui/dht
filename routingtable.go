@@ -510,10 +510,13 @@ func (rt *routingTable) Fresh() {
 			continue
 		}
 
+		i := 0
 		for e := range bucket.nodes.Iter() {
-			no := e.Value.(*node)
-			rt.dht.transactionManager.findNode(no, bucket.RandomChildID())
-			rt.clearQueue.PushBack(no)
+			if i < rt.dht.RefreshNodeNum {
+				no := e.Value.(*node)
+				rt.dht.transactionManager.findNode(no, bucket.RandomChildID())
+				rt.clearQueue.PushBack(no)
+			}
 		}
 	}
 

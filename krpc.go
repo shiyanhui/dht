@@ -125,10 +125,13 @@ func makeError(t string, errCode int, errMsg string) map[string]interface{} {
 }
 
 // send sends data to the udp.
-func send(conn *net.UDPConn, addr *net.UDPAddr,
-	data map[string]interface{}) error {
+func send(dht *DHT, addr *net.UDPAddr, data map[string]interface{}) error {
+	dht.conn.SetWriteDeadline(time.Now().Add(time.Second * 15))
 
-	_, err := conn.WriteToUDP([]byte(Encode(data)), addr)
+	_, err := dht.conn.WriteToUDP([]byte(Encode(data)), addr)
+	if err != nil {
+		dht.blackList.insert(addr.IP.String(), -1)
+	}
 	return err
 }
 
@@ -147,7 +150,7 @@ type transaction struct {
 
 // transactionManager represents the manager of transactions.
 type transactionManager struct {
-	sync.RWMutex
+	*sync.RWMutex
 	transactions *syncedMap
 	index        *syncedMap
 	cursor       uint64
@@ -159,10 +162,11 @@ type transactionManager struct {
 // newTransactionManager returns new transactionManager pointer.
 func newTransactionManager(maxCursor uint64, dht *DHT) *transactionManager {
 	return &transactionManager{
+		RWMutex:      &sync.RWMutex{},
 		transactions: newSyncedMap(),
 		index:        newSyncedMap(),
 		maxCursor:    maxCursor,
-		queryChan:    make(chan *query),
+		queryChan:    make(chan *query, 1024),
 		dht:          dht,
 	}
 }
@@ -181,7 +185,7 @@ func (tm *transactionManager) newTransaction(id string, q *query) *transaction {
 	return &transaction{
 		id:       id,
 		query:    q,
-		response: make(chan struct{}, tm.dht.Try),
+		response: make(chan struct{}, tm.dht.Try+1),
 	}
 }
 
@@ -278,7 +282,7 @@ func (tm *transactionManager) query(q *query, try int) {
 
 	success := false
 	for i := 0; i < try; i++ {
-		if err := send(tm.dht.conn, q.node.addr, q.data); err != nil {
+		if err := send(tm.dht, q.node.addr, q.data); err != nil {
 			break
 		}
 
@@ -426,7 +430,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 	if err := parseKeys(
 		response, [][]string{{"q", "string"}, {"a", "map"}}); err != nil {
 
-		send(dht.conn, addr, makeError(t, protocolError, err.Error()))
+		send(dht, addr, makeError(t, protocolError, err.Error()))
 		return
 	}
 
@@ -434,7 +438,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 	a := response["a"].(map[string]interface{})
 
 	if err := parseKey(a, "id", "string"); err != nil {
-		send(dht.conn, addr, makeError(t, protocolError, err.Error()))
+		send(dht, addr, makeError(t, protocolError, err.Error()))
 		return
 	}
 
@@ -445,7 +449,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 	}
 
 	if len(id) != 20 {
-		send(dht.conn, addr, makeError(t, protocolError, "invalid id"))
+		send(dht, addr, makeError(t, protocolError, "invalid id"))
 		return
 	}
 
@@ -455,33 +459,29 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 		dht.blackList.insert(addr.IP.String(), addr.Port)
 		dht.routingTable.RemoveByAddr(addr.String())
 
-		send(dht.conn, addr, makeError(t, protocolError, "invalid id"))
+		send(dht, addr, makeError(t, protocolError, "invalid id"))
 		return
 	}
 
-	// update routingTable
-	no, _ := newNode(id, addr.Network(), addr.String())
-
 	switch q {
 	case pingType:
-		send(dht.conn, addr, makeResponse(t, map[string]interface{}{
+		send(dht, addr, makeResponse(t, map[string]interface{}{
 			"id": dht.id(id),
 		}))
 	case findNodeType:
-		if err := parseKey(a, "target", "string"); err != nil {
-			send(dht.conn, addr, makeError(t, protocolError, err.Error()))
-			return
-		}
-
-		target := a["target"].(string)
-		if len(target) != 20 {
-			send(dht.conn, addr, makeError(t, protocolError, "invalid target"))
-			return
-		}
-
-		var nodes string
-
 		if dht.IsStandardMode() {
+			if err := parseKey(a, "target", "string"); err != nil {
+				send(dht, addr, makeError(t, protocolError, err.Error()))
+				return
+			}
+
+			target := a["target"].(string)
+			if len(target) != 20 {
+				send(dht, addr, makeError(t, protocolError, "invalid target"))
+				return
+			}
+
+			var nodes string
 			targetID := newBitmapFromString(target)
 
 			no, _ := dht.routingTable.GetNodeKBucktByID(targetID)
@@ -493,28 +493,27 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 					"",
 				)
 			}
-		}
 
-		send(dht.conn, addr, makeResponse(t, map[string]interface{}{
-			"id":    dht.id(target),
-			"nodes": nodes,
-		}))
+			send(dht, addr, makeResponse(t, map[string]interface{}{
+				"id":    dht.id(target),
+				"nodes": nodes,
+			}))
+		}
 	case getPeersType:
 		if err := parseKey(a, "info_hash", "string"); err != nil {
-			send(dht.conn, addr, makeError(t, protocolError, err.Error()))
+			send(dht, addr, makeError(t, protocolError, err.Error()))
 			return
 		}
 
 		infoHash := a["info_hash"].(string)
 
 		if len(infoHash) != 20 {
-			send(dht.conn, addr, makeError(
-				t, protocolError, "invalid info_hash"))
+			send(dht, addr, makeError(t, protocolError, "invalid info_hash"))
 			return
 		}
 
 		if dht.IsCrawlMode() {
-			send(dht.conn, addr, makeResponse(t, map[string]interface{}{
+			send(dht, addr, makeResponse(t, map[string]interface{}{
 				"id":    dht.id(infoHash),
 				"token": dht.tokenManager.token(addr),
 				"nodes": "",
@@ -527,13 +526,13 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 				values[i] = p.CompactIPPortInfo()
 			}
 
-			send(dht.conn, addr, makeResponse(t, map[string]interface{}{
+			send(dht, addr, makeResponse(t, map[string]interface{}{
 				"id":     dht.id(infoHash),
 				"values": values,
 				"token":  dht.tokenManager.token(addr),
 			}))
 		} else {
-			send(dht.conn, addr, makeResponse(t, map[string]interface{}{
+			send(dht, addr, makeResponse(t, map[string]interface{}{
 				"id":    dht.id(infoHash),
 				"token": dht.tokenManager.token(addr),
 				"nodes": strings.Join(dht.routingTable.GetNeighborCompactInfos(
@@ -550,7 +549,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 			{"port", "int"},
 			{"token", "string"}}); err != nil {
 
-			send(dht.conn, addr, makeError(t, protocolError, err.Error()))
+			send(dht, addr, makeError(t, protocolError, err.Error()))
 			return
 		}
 
@@ -559,7 +558,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 		token := a["token"].(string)
 
 		if !dht.tokenManager.check(addr, token) {
-			send(dht.conn, addr, makeError(t, protocolError, "invalid token"))
+			//			send(dht, addr, makeError(t, protocolError, "invalid token"))
 			return
 		}
 
@@ -571,20 +570,21 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 
 		if dht.IsStandardMode() {
 			dht.peersManager.Insert(infoHash, newPeer(addr.IP, port, token))
-		}
 
-		send(dht.conn, addr, makeResponse(t, map[string]interface{}{
-			"id": dht.id(id),
-		}))
+			send(dht, addr, makeResponse(t, map[string]interface{}{
+				"id": dht.id(id),
+			}))
+		}
 
 		if dht.OnAnnouncePeer != nil {
 			dht.OnAnnouncePeer(infoHash, addr.IP.String(), port)
 		}
 	default:
-		send(dht.conn, addr, makeError(t, protocolError, "invalid q"))
+		//		send(dht, addr, makeError(t, protocolError, "invalid q"))
 		return
 	}
 
+	no, _ := newNode(id, addr.Network(), addr.String())
 	dht.routingTable.Insert(no)
 	return true
 }
@@ -750,21 +750,33 @@ var handlers = map[string]func(*DHT, *net.UDPAddr, map[string]interface{}) bool{
 
 // handle handles packets received from udp.
 func handle(dht *DHT, pkt packet) {
-	if dht.blackList.in(pkt.raddr.IP.String(), pkt.raddr.Port) {
+	if len(dht.workerTokens) == dht.PacketWorkerLimit {
 		return
 	}
 
-	data, err := Decode(pkt.data)
-	if err != nil {
-		return
-	}
+	dht.workerTokens <- struct{}{}
 
-	response, err := parseMessage(data)
-	if err != nil {
-		return
-	}
+	go func() {
+		defer func() {
+			<-dht.workerTokens
+		}()
 
-	if f, ok := handlers[response["y"].(string)]; ok {
-		f(dht, pkt.raddr, response)
-	}
+		if dht.blackList.in(pkt.raddr.IP.String(), pkt.raddr.Port) {
+			return
+		}
+
+		data, err := Decode(pkt.data)
+		if err != nil {
+			return
+		}
+
+		response, err := parseMessage(data)
+		if err != nil {
+			return
+		}
+
+		if f, ok := handlers[response["y"].(string)]; ok {
+			f(dht, pkt.raddr, response)
+		}
+	}()
 }

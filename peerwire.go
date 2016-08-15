@@ -40,6 +40,7 @@ var handshakePrefix = []byte{
 // read reads size-length bytes from conn to data.
 func read(conn *net.TCPConn, size int, data *bytes.Buffer) error {
 	conn.SetReadDeadline(time.Now().Add(time.Second * 15))
+
 	n, err := io.CopyN(data, conn, int64(size))
 	if err != nil || n != int64(size) {
 		return errors.New("read error")
@@ -73,6 +74,7 @@ func sendMessage(conn *net.TCPConn, data []byte) error {
 	buffer := bytes.NewBuffer(nil)
 	binary.Write(buffer, binary.BigEndian, length)
 
+	conn.SetWriteDeadline(time.Now().Add(time.Second * 10))
 	_, err := conn.Write(append(buffer.Bytes(), data...))
 	return err
 }
@@ -84,6 +86,7 @@ func sendHandshake(conn *net.TCPConn, infoHash, peerID []byte) error {
 	copy(data[28:48], infoHash)
 	copy(data[48:], peerID)
 
+	conn.SetWriteDeadline(time.Now().Add(time.Second * 10))
 	_, err := conn.Write(data)
 	return err
 }
@@ -157,19 +160,24 @@ type Response struct {
 
 // Wire represents the wire protocol.
 type Wire struct {
-	blackList *blackList
-	queue     *syncedMap
-	requests  chan Request
-	responses chan Response
+	blackList    *blackList
+	queue        *syncedMap
+	requests     chan Request
+	responses    chan Response
+	workerTokens chan struct{}
 }
 
 // NewWire returns a Wire pointer.
-func NewWire(blackListMaxSize int) *Wire {
+//   - blackListSize: the blacklist size
+//   - requestQueueSize: the max requests it can buffers
+//   - workerQueueSize: the max goroutine downloading workers
+func NewWire(blackListSize, requestQueueSize, workerQueueSize int) *Wire {
 	return &Wire{
-		blackList: newBlackList(blackListMaxSize),
-		queue:     newSyncedMap(),
-		requests:  make(chan Request, 256),
-		responses: make(chan Response, 256),
+		blackList:    newBlackList(blackListSize),
+		queue:        newSyncedMap(),
+		requests:     make(chan Request, requestQueueSize),
+		responses:    make(chan Response, 1024),
+		workerTokens: make(chan struct{}, workerQueueSize),
 	}
 }
 
@@ -354,19 +362,24 @@ func (wire *Wire) fetchMetadata(r Request) {
 func (wire *Wire) Run() {
 	go wire.blackList.clear()
 
-	var r Request
-	for {
-		r = <-wire.requests
+	for r := range wire.requests {
+		wire.workerTokens <- struct{}{}
 
-		key := strings.Join([]string{
-			string(r.InfoHash), genAddress(r.IP, r.Port),
-		}, ":")
+		go func(r Request) {
+			defer func() {
+				<-wire.workerTokens
+			}()
 
-		if len(r.InfoHash) != 20 || wire.blackList.in(r.IP, r.Port) ||
-			wire.queue.Has(key) {
-			continue
-		}
+			key := strings.Join([]string{
+				string(r.InfoHash), genAddress(r.IP, r.Port),
+			}, ":")
 
-		go wire.fetchMetadata(r)
+			if len(r.InfoHash) != 20 || wire.blackList.in(r.IP, r.Port) ||
+				wire.queue.Has(key) {
+				return
+			}
+
+			wire.fetchMetadata(r)
+		}(r)
 	}
 }
