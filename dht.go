@@ -5,6 +5,7 @@ package dht
 import (
 	"encoding/hex"
 	"errors"
+	"math"
 	"net"
 	"time"
 )
@@ -77,7 +78,7 @@ func NewStandardConfig() *Config {
 		KBucketExpiredAfter:  time.Duration(time.Minute * 15),
 		CheckKBucketPeriod:   time.Duration(time.Second * 30),
 		TokenExpiredAfter:    time.Duration(time.Minute * 10),
-		MaxTransactionCursor: 4294967295, // 2 ^ 32 - 1
+		MaxTransactionCursor: math.MaxUint32,
 		MaxNodes:             5000,
 		BlockedIPs:           make([]string, 0),
 		BlackListMaxSize:     65536,
@@ -95,7 +96,7 @@ func NewCrawlConfig() *Config {
 	config.NodeExpriedAfter = 0
 	config.KBucketExpiredAfter = 0
 	config.CheckKBucketPeriod = time.Second * 5
-	config.KBucketSize = 2147483647 // 2 ^ 31 - 1
+	config.KBucketSize = math.MaxInt32
 	config.Mode = CrawlMode
 	config.RefreshNodeNum = 256
 
