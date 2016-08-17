@@ -1,5 +1,3 @@
-## DHT
-
 ![](https://raw.githubusercontent.com/shiyanhui/dht/master/doc/screen-shot.png)
 
 See the video on the [Youtube](https://www.youtube.com/watch?v=AIpeQtw22kc).
@@ -61,6 +59,12 @@ func main() {
 ## Download
 
 You can download the demo compiled binary file [here](https://github.com/shiyanhui/dht/files/407021/spider.zip).
+
+## Note
+
+- The default crawl mode configure costs about 300M RAM. Set **MaxNodes**
+  and **BlackListMaxSize** to fit yourself.
+- Now it cant't run in LAN because of NAT.
 
 ## TODO
 
