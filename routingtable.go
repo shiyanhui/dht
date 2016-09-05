@@ -517,6 +517,7 @@ func (rt *routingTable) Fresh() {
 				rt.dht.transactionManager.findNode(no, bucket.RandomChildID())
 				rt.clearQueue.PushBack(no)
 			}
+			i++
 		}
 	}
 
