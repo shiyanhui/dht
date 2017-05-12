@@ -72,6 +72,16 @@ You can download the demo compiled binary file [here](https://github.com/shiyanh
 - [ ] Implements the full BEP-3.
 - [ ] Optimization.
 
+## FAQ
+
+#### Why it is slow compared to other spiders ?
+
+Well, maybe there are several reasons.
+
+- DHT aims to implements the standard BitTorrent DHT protocol, not born for crawling the DHT network.
+- NAT Traversal issue. You run the crawler in a local network.
+- It will block ip which looks like bad and a good ip may be mis-judged.
+
 ## License
 
 MIT, read more [here](https://github.com/shiyanhui/dht/blob/master/LICENSE)
