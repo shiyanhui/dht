@@ -577,17 +577,22 @@ func getTopK(queue []interface{}, id *bitmap, k int) []interface{} {
 
 	for _, value := range queue {
 		node := value.(*node)
-		item := &heapItem{
-			id.Xor(node.id),
-			value,
-		}
+		distance := id.Xor(node.id)
 		if topkHeap.Len() == k {
 			var last = topkHeap[topkHeap.Len() - 1]
-			if last.distance.Compare(item.distance, maxPrefixLength) == 1 {
+			if last.distance.Compare(distance, maxPrefixLength) == 1 {
+				item := &heapItem{
+					distance,
+					value,
+				}
 				heap.Push(&topkHeap, item)
 				heap.Pop(&topkHeap)
 			}
 		} else {
+			item := &heapItem{
+				distance,
+				value,
+			}
 			heap.Push(&topkHeap, item)
 		}
 	}
