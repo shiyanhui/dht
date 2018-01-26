@@ -3,6 +3,8 @@ package dht
 import (
 	"fmt"
 	"strings"
+	"bytes"
+	"unsafe"
 )
 
 // bitmap represents a bit array.
@@ -101,12 +103,9 @@ func (bitmap *bitmap) Compare(other *bitmap, prefixLen int) int {
 	}
 
 	div, mod := prefixLen/8, prefixLen%8
-	for i := 0; i < div; i++ {
-		if bitmap.data[i] > other.data[i] {
-			return 1
-		} else if bitmap.data[i] < other.data[i] {
-			return -1
-		}
+	res := bytes.Compare(bitmap.data[:div], other.data[:div])
+	if res != 0  {
+		return res
 	}
 
 	for i := div * 8; i < div*8+mod; i++ {
@@ -120,6 +119,31 @@ func (bitmap *bitmap) Compare(other *bitmap, prefixLen int) int {
 
 	return 0
 }
+const wordSize = int(unsafe.Sizeof(uintptr(0)))
+
+func fastXORBytes(dst, a, b []byte) int {
+	n := len(a)
+	if len(b) < n {
+		n = len(b)
+	}
+
+	w := n / wordSize
+	if w > 0 {
+		dw := *(*[]uintptr)(unsafe.Pointer(&dst))
+		aw := *(*[]uintptr)(unsafe.Pointer(&a))
+		bw := *(*[]uintptr)(unsafe.Pointer(&b))
+		for i := 0; i < w; i++ {
+			dw[i] = aw[i] ^ bw[i]
+		}
+	}
+
+	for i := n - n%wordSize; i < n; i++ {
+		dst[i] = a[i] ^ b[i]
+	}
+
+	return n
+}
+
 
 // Xor returns the xor value of two bitmap.
 func (bitmap *bitmap) Xor(other *bitmap) *bitmap {
@@ -130,9 +154,7 @@ func (bitmap *bitmap) Xor(other *bitmap) *bitmap {
 	distance := newBitmap(bitmap.Size)
 	div, mod := distance.Size/8, distance.Size%8
 
-	for i := 0; i < div; i++ {
-		distance.data[i] = bitmap.data[i] ^ other.data[i]
-	}
+	fastXORBytes(distance.data, bitmap.data[:div], other.data[:div])
 
 	for i := div * 8; i < div*8+mod; i++ {
 		distance.set(i, bitmap.Bit(i)^other.Bit(i))
