@@ -395,7 +395,7 @@ func parseKey(data map[string]interface{}, key string, t string) error {
 }
 
 // parseKeys parses keys. It just wraps parseKey.
-func parseKeys(data map[string]interface{}, pairs [][]string) error {
+func ParseKeys(data map[string]interface{}, pairs [][]string) error {
 	for _, args := range pairs {
 		key, t := args[0], args[1]
 		if err := parseKey(data, key, t); err != nil {
@@ -413,7 +413,7 @@ func parseMessage(data interface{}) (map[string]interface{}, error) {
 		return nil, errors.New("response is not dict")
 	}
 
-	if err := parseKeys(
+	if err := ParseKeys(
 		response, [][]string{{"t", "string"}, {"y", "string"}}); err != nil {
 		return nil, err
 	}
@@ -427,7 +427,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 
 	t := response["t"].(string)
 
-	if err := parseKeys(
+	if err := ParseKeys(
 		response, [][]string{{"q", "string"}, {"a", "map"}}); err != nil {
 
 		send(dht, addr, makeError(t, protocolError, err.Error()))
@@ -544,7 +544,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 			dht.OnGetPeers(infoHash, addr.IP.String(), addr.Port)
 		}
 	case announcePeerType:
-		if err := parseKeys(a, [][]string{
+		if err := ParseKeys(a, [][]string{
 			{"info_hash", "string"},
 			{"port", "int"},
 			{"token", "string"}}); err != nil {

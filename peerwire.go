@@ -126,7 +126,7 @@ func getUTMetaSize(data []byte) (
 		return
 	}
 
-	if err = parseKeys(
+	if err = ParseKeys(
 		dict, [][]string{{"metadata_size", "int"}, {"m", "map"}}); err != nil {
 		return
 	}
@@ -318,7 +318,7 @@ func (wire *Wire) fetchMetadata(r Request) {
 			}
 			dict := d.(map[string]interface{})
 
-			if err = parseKeys(dict, [][]string{
+			if err = ParseKeys(dict, [][]string{
 				{"msg_type", "int"},
 				{"piece", "int"}}); err != nil {
 				return
