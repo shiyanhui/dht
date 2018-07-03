@@ -132,7 +132,7 @@ func getUTMetaSize(data []byte) (
 	}
 
 	m := dict["m"].(map[string]interface{})
-	if err = parseKey(m, "ut_metadata", "int"); err != nil {
+	if err = ParseKey(m, "ut_metadata", "int"); err != nil {
 		return
 	}
 

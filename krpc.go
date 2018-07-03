@@ -366,9 +366,9 @@ func (tm *transactionManager) announcePeer(
 	})
 }
 
-// parseKey parses the key in dict data. `t` is type of the keyed value.
+// ParseKey parses the key in dict data. `t` is type of the keyed value.
 // It's one of "int", "string", "map", "list".
-func parseKey(data map[string]interface{}, key string, t string) error {
+func ParseKey(data map[string]interface{}, key string, t string) error {
 	val, ok := data[key]
 	if !ok {
 		return errors.New("lack of key")
@@ -394,11 +394,11 @@ func parseKey(data map[string]interface{}, key string, t string) error {
 	return nil
 }
 
-// parseKeys parses keys. It just wraps parseKey.
+// ParseKeys parses keys. It just wraps ParseKey.
 func ParseKeys(data map[string]interface{}, pairs [][]string) error {
 	for _, args := range pairs {
 		key, t := args[0], args[1]
-		if err := parseKey(data, key, t); err != nil {
+		if err := ParseKey(data, key, t); err != nil {
 			return err
 		}
 	}
@@ -437,7 +437,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 	q := response["q"].(string)
 	a := response["a"].(map[string]interface{})
 
-	if err := parseKey(a, "id", "string"); err != nil {
+	if err := ParseKey(a, "id", "string"); err != nil {
 		send(dht, addr, makeError(t, protocolError, err.Error()))
 		return
 	}
@@ -470,7 +470,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 		}))
 	case findNodeType:
 		if dht.IsStandardMode() {
-			if err := parseKey(a, "target", "string"); err != nil {
+			if err := ParseKey(a, "target", "string"); err != nil {
 				send(dht, addr, makeError(t, protocolError, err.Error()))
 				return
 			}
@@ -500,7 +500,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 			}))
 		}
 	case getPeersType:
-		if err := parseKey(a, "info_hash", "string"); err != nil {
+		if err := ParseKey(a, "info_hash", "string"); err != nil {
 			send(dht, addr, makeError(t, protocolError, err.Error()))
 			return
 		}
@@ -595,7 +595,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 func findOn(dht *DHT, r map[string]interface{}, target *bitmap,
 	queryType string) error {
 
-	if err := parseKey(r, "nodes", "string"); err != nil {
+	if err := ParseKey(r, "nodes", "string"); err != nil {
 		return err
 	}
 
@@ -648,7 +648,7 @@ func handleResponse(dht *DHT, addr *net.UDPAddr,
 	}
 
 	// inform transManager to delete the transaction.
-	if err := parseKey(response, "r", "map"); err != nil {
+	if err := ParseKey(response, "r", "map"); err != nil {
 		return
 	}
 
@@ -656,7 +656,7 @@ func handleResponse(dht *DHT, addr *net.UDPAddr,
 	a := trans.data["a"].(map[string]interface{})
 	r := response["r"].(map[string]interface{})
 
-	if err := parseKey(r, "id", "string"); err != nil {
+	if err := ParseKey(r, "id", "string"); err != nil {
 		return
 	}
 
@@ -687,14 +687,14 @@ func handleResponse(dht *DHT, addr *net.UDPAddr,
 			return
 		}
 	case getPeersType:
-		if err := parseKey(r, "token", "string"); err != nil {
+		if err := ParseKey(r, "token", "string"); err != nil {
 			return
 		}
 
 		token := r["token"].(string)
 		infoHash := a["info_hash"].(string)
 
-		if err := parseKey(r, "values", "list"); err == nil {
+		if err := ParseKey(r, "values", "list"); err == nil {
 			values := r["values"].([]interface{})
 			for _, v := range values {
 				p, err := newPeerFromCompactIPPortInfo(v.(string), token)
@@ -725,7 +725,7 @@ func handleResponse(dht *DHT, addr *net.UDPAddr,
 func handleError(dht *DHT, addr *net.UDPAddr,
 	response map[string]interface{}) (success bool) {
 
-	if err := parseKey(response, "e", "list"); err != nil {
+	if err := ParseKey(response, "e", "list"); err != nil {
 		return
 	}
 
