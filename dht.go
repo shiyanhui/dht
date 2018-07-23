@@ -17,6 +17,9 @@ const (
 	CrawlMode
 )
 
+// ErrNotReady is the error when DHT is not initialized.
+var ErrNotReady = errors.New("dht is not ready")
+
 // Config represents the configure of dht.
 type Config struct {
 	// in mainline dht, k = 8
@@ -228,7 +231,7 @@ func (dht *DHT) id(target string) string {
 // GetPeers returns peers who have announced having infoHash.
 func (dht *DHT) GetPeers(infoHash string) ([]*Peer, error) {
 	if !dht.Ready {
-		return nil, errors.New("dht not ready")
+		return nil, ErrNotReady
 	}
 
 	if len(infoHash) == 40 {
