@@ -702,6 +702,9 @@ func handleResponse(dht *DHT, addr *net.UDPAddr,
 					continue
 				}
 				dht.peersManager.Insert(infoHash, p)
+				if dht.OnGetPeersResponse != nil {
+					dht.OnGetPeersResponse(infoHash, p)
+				}
 			}
 		} else if findOn(
 			dht, r, newBitmapFromString(infoHash), getPeersType) != nil {

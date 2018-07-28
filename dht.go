@@ -17,8 +17,13 @@ const (
 	CrawlMode
 )
 
-// ErrNotReady is the error when DHT is not initialized.
-var ErrNotReady = errors.New("dht is not ready")
+var (
+	// ErrNotReady is the error when DHT is not initialized.
+	ErrNotReady = errors.New("dht is not ready")
+	// ErrOnGetPeersResponseNotSet is the error that config
+	// OnGetPeersResponseNotSet is not set when call dht.GetPeers.
+	ErrOnGetPeersResponseNotSet = errors.New("OnGetPeersResponse is not set")
+)
 
 // Config represents the configure of dht.
 type Config struct {
@@ -47,6 +52,8 @@ type Config struct {
 	MaxNodes int
 	// callback when got get_peers request
 	OnGetPeers func(string, string, int)
+	// callback when receive get_peers response
+	OnGetPeersResponse func(string, *Peer)
 	// callback when got announce_peer request
 	OnAnnouncePeer func(string, string, int)
 	// blcoked ips
@@ -229,48 +236,31 @@ func (dht *DHT) id(target string) string {
 }
 
 // GetPeers returns peers who have announced having infoHash.
-func (dht *DHT) GetPeers(infoHash string) ([]*Peer, error) {
+func (dht *DHT) GetPeers(infoHash string) error {
 	if !dht.Ready {
-		return nil, ErrNotReady
+		return ErrNotReady
+	}
+
+	if dht.OnGetPeersResponse == nil {
+		return ErrOnGetPeersResponseNotSet
 	}
 
 	if len(infoHash) == 40 {
 		data, err := hex.DecodeString(infoHash)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		infoHash = string(data)
 	}
 
-	peers := dht.peersManager.GetPeers(infoHash, dht.K)
-	if len(peers) != 0 {
-		return peers, nil
+	neighbors := dht.routingTable.GetNeighbors(
+		newBitmapFromString(infoHash), dht.routingTable.Len())
+
+	for _, no := range neighbors {
+		dht.transactionManager.getPeers(no, infoHash)
 	}
 
-	ch := make(chan struct{})
-
-	go func() {
-		neighbors := dht.routingTable.GetNeighbors(
-			newBitmapFromString(infoHash), dht.K)
-
-		for _, no := range neighbors {
-			dht.transactionManager.getPeers(no, infoHash)
-		}
-
-		i := 0
-		for _ = range time.Tick(time.Second * 1) {
-			i++
-			peers = dht.peersManager.GetPeers(infoHash, dht.K)
-			if len(peers) != 0 || i == 30 {
-				break
-			}
-		}
-
-		ch <- struct{}{}
-	}()
-
-	<-ch
-	return peers, nil
+	return nil
 }
 
 // Run starts the dht.
