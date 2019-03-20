@@ -1,10 +1,9 @@
 package dht
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
-	"bytes"
-	"unsafe"
 )
 
 // bitmap represents a bit array.
@@ -15,7 +14,7 @@ type bitmap struct {
 
 // newBitmap returns a size-length bitmap pointer.
 func newBitmap(size int) *bitmap {
-	div, mod := size/8, size%8
+	div, mod := size>>3, size&0x07
 	if mod > 0 {
 		div++
 	}
@@ -31,13 +30,13 @@ func newBitmapFrom(other *bitmap, size int) *bitmap {
 		size = other.Size
 	}
 
-	div := size / 8
+	div := size >> 3
 
 	for i := 0; i < div; i++ {
 		bitmap.data[i] = other.data[i]
 	}
 
-	for i := div * 8; i < size; i++ {
+	for i := div << 3; i < size; i++ {
 		if other.Bit(i) == 1 {
 			bitmap.Set(i)
 		}
@@ -48,7 +47,7 @@ func newBitmapFrom(other *bitmap, size int) *bitmap {
 
 // newBitmapFromBytes returns a bitmap pointer created from a byte array.
 func newBitmapFromBytes(data []byte) *bitmap {
-	bitmap := newBitmap(len(data) * 8)
+	bitmap := newBitmap(len(data) << 3)
 	copy(bitmap.data, data)
 	return bitmap
 }
@@ -64,7 +63,7 @@ func (bitmap *bitmap) Bit(index int) int {
 		panic("index out of range")
 	}
 
-	div, mod := index/8, index%8
+	div, mod := index>>3, index&0x07
 	return int((uint(bitmap.data[div]) & (1 << uint(7-mod))) >> uint(7-mod))
 }
 
@@ -74,7 +73,7 @@ func (bitmap *bitmap) set(index int, bit int) {
 		panic("index out of range")
 	}
 
-	div, mod := index/8, index%8
+	div, mod := index>>3, index&0x07
 	shift := byte(1 << uint(7-mod))
 
 	bitmap.data[div] &= ^shift
@@ -102,13 +101,13 @@ func (bitmap *bitmap) Compare(other *bitmap, prefixLen int) int {
 		panic("index out of range")
 	}
 
-	div, mod := prefixLen/8, prefixLen%8
+	div, mod := prefixLen>>3, prefixLen&0x07
 	res := bytes.Compare(bitmap.data[:div], other.data[:div])
-	if res != 0  {
+	if res != 0 {
 		return res
 	}
 
-	for i := div * 8; i < div*8+mod; i++ {
+	for i := div << 3; i < (div<<3)+mod; i++ {
 		bit1, bit2 := bitmap.Bit(i), other.Bit(i)
 		if bit1 > bit2 {
 			return 1
@@ -119,31 +118,6 @@ func (bitmap *bitmap) Compare(other *bitmap, prefixLen int) int {
 
 	return 0
 }
-const wordSize = int(unsafe.Sizeof(uintptr(0)))
-
-func fastXORBytes(dst, a, b []byte) int {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
-	}
-
-	w := n / wordSize
-	if w > 0 {
-		dw := *(*[]uintptr)(unsafe.Pointer(&dst))
-		aw := *(*[]uintptr)(unsafe.Pointer(&a))
-		bw := *(*[]uintptr)(unsafe.Pointer(&b))
-		for i := 0; i < w; i++ {
-			dw[i] = aw[i] ^ bw[i]
-		}
-	}
-
-	for i := n - n%wordSize; i < n; i++ {
-		dst[i] = a[i] ^ b[i]
-	}
-
-	return n
-}
-
 
 // Xor returns the xor value of two bitmap.
 func (bitmap *bitmap) Xor(other *bitmap) *bitmap {
@@ -152,20 +126,14 @@ func (bitmap *bitmap) Xor(other *bitmap) *bitmap {
 	}
 
 	distance := newBitmap(bitmap.Size)
-	div, mod := distance.Size/8, distance.Size%8
-
-	fastXORBytes(distance.data, bitmap.data[:div], other.data[:div])
-
-	for i := div * 8; i < div*8+mod; i++ {
-		distance.set(i, bitmap.Bit(i)^other.Bit(i))
-	}
+	xor(distance.data, bitmap.data, other.data)
 
 	return distance
 }
 
 // String returns the bit sequence string of the bitmap.
 func (bitmap *bitmap) String() string {
-	div, mod := bitmap.Size/8, bitmap.Size%8
+	div, mod := bitmap.Size>>3, bitmap.Size&0x07
 	buff := make([]string, div+mod)
 
 	for i := 0; i < div; i++ {
